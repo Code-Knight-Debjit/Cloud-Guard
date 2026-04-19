@@ -4,7 +4,7 @@ FastAPI Backend for Cloud Misconfiguration Detection System
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 import sys
 import os
 
@@ -28,7 +28,8 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"status": "online", "service": "Cloud Threat Detection API"}
+    dashboard_path = os.path.join(os.path.dirname(__file__), "..", "frontend", "dashboard.html")
+    return FileResponse(dashboard_path)
 
 
 @app.get("/api/scan")

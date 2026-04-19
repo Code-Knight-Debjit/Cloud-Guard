@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CloudGuard — Threat Detection System</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0a0e1a;--bg2:#0f1627;--bg3:#151d30;--bg4:#1a2340;
+    --accent:#00d4ff;--accent2:#ff3366;--accent3:#00ff88;--accent4:#ffa500;
+    --text:#e8eef8;--text2:#8899bb;--text3:#4a5a7a;
+    --border:#1e2d4a;--border2:#253352;
+    --crit:#ff3366;--high:#ff6b35;--med:#ffa500;--low:#00d4ff;
+    --crit-bg:rgba(255,51,102,0.08);--high-bg:rgba(255,107,53,0.08);
+    --med-bg:rgba(255,165,0,0.08);--low-bg:rgba(0,212,255,0.08);
+  }
+  body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overflow-x:hidden}
+  .mono{font-family:'JetBrains Mono',monospace}
+
+  /* HEADER */
+  .header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:32px;height:32px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center}
+  .logo-icon svg{width:18px;height:18px;fill:var(--bg)}
+  .logo-text{font-size:16px;font-weight:700;letter-spacing:-0.3px}
+  .logo-sub{font-size:10px;font-weight:400;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;margin-top:1px}
+  .header-right{display:flex;align-items:center;gap:16px}
+  .mode-badge{font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 10px;background:rgba(0,212,255,0.1);color:var(--accent);border:1px solid rgba(0,212,255,0.25);border-radius:4px;text-transform:uppercase;letter-spacing:1px}
+  .scan-btn{background:var(--accent);color:var(--bg);border:none;padding:8px 20px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;letter-spacing:0.3px;transition:all .2s}
+  .scan-btn:hover{background:#22e0ff;transform:translateY(-1px)}
+  .scan-btn:active{transform:translateY(0)}
+  .scan-btn:disabled{background:#253352;color:var(--text2);cursor:not-allowed;transform:none}
+  .scan-btn svg{width:14px;height:14px}
+
+  /* SCANNING OVERLAY */
+  .scan-overlay{position:fixed;inset:0;background:rgba(10,14,26,0.92);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px}
+  .scan-title{font-size:20px;font-weight:700;color:var(--accent)}
+  .scan-steps{display:flex;flex-direction:column;gap:8px;width:360px}
+  .scan-step{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:10px;transition:color .3s}
+  .scan-step.active{color:var(--accent)}
+  .scan-step.done{color:var(--accent3)}
+  .scan-step-dot{width:6px;height:6px;border-radius:50%;background:var(--text3);flex-shrink:0;transition:background .3s}
+  .scan-step.active .scan-step-dot{background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .scan-step.done .scan-step-dot{background:var(--accent3)}
+  .scan-progress{width:360px;height:3px;background:var(--border);border-radius:2px;overflow:hidden}
+  .scan-bar{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent3));border-radius:2px;transition:width .4s ease;width:0%}
+  .hidden{display:none!important}
+
+  /* LAYOUT */
+  .main{padding:1.5rem 2rem;max-width:1400px;margin:0 auto}
+
+  /* SCORE BANNER */
+  .score-banner{display:grid;grid-template-columns:auto 1fr auto auto auto auto;gap:1.5rem;align-items:center;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.5rem 2rem;margin-bottom:1.5rem}
+  .score-ring{position:relative;width:90px;height:90px;flex-shrink:0}
+  .score-ring svg{transform:rotate(-90deg)}
+  .score-ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .score-num{font-size:24px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1}
+  .score-grade{font-size:11px;font-weight:600;margin-top:2px;letter-spacing:1px}
+  .score-info h1{font-size:15px;font-weight:700;margin-bottom:4px}
+  .score-info p{font-size:12px;color:var(--text2);font-family:'JetBrains Mono',monospace}
+  .stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:12px 16px;text-align:center;min-width:100px}
+  .stat-card-num{font-size:22px;font-weight:800;font-family:'JetBrains Mono',monospace;line-height:1}
+  .stat-card-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+  .crit-col{color:var(--crit)}
+  .high-col{color:var(--high)}
+  .med-col{color:var(--med)}
+  .low-col{color:var(--low)}
+
+  /* GRID */
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
+  .grid-full{margin-bottom:1.5rem}
+  .panel{background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .panel-header{padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .panel-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px}
+  .panel-badge{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);padding:2px 8px;border-radius:4px;margin-left:auto}
+  .panel-body{padding:1.25rem}
+
+  /* SEVERITY BAR */
+  .sev-bars{display:flex;flex-direction:column;gap:10px}
+  .sev-row{display:flex;align-items:center;gap:10px}
+  .sev-label{font-size:11px;font-weight:600;letter-spacing:0.5px;width:58px;text-transform:uppercase}
+  .sev-track{flex:1;height:6px;background:var(--bg4);border-radius:3px;overflow:hidden}
+  .sev-fill{height:100%;border-radius:3px;transition:width 1s ease}
+  .sev-count{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;width:28px;text-align:right}
+
+  /* RESOURCE CHART */
+  .res-bars{display:flex;flex-direction:column;gap:8px}
+  .res-row{display:flex;align-items:center;gap:10px}
+  .res-label{font-size:11px;color:var(--text2);width:80px;flex-shrink:0}
+  .res-track{flex:1;height:20px;background:var(--bg4);border-radius:4px;overflow:hidden;position:relative}
+  .res-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:10px;font-family:'JetBrains Mono',monospace;font-weight:600;color:var(--bg);transition:width 1s ease}
+  .res-count{font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace;width:20px;text-align:right}
+
+  /* ATTACK CHAIN */
+  .chain-card{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:1.25rem;margin-bottom:1rem;border-left:3px solid var(--crit)}
+  .chain-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+  .chain-name{font-size:13px;font-weight:700}
+  .chain-meta{display:flex;align-items:center;gap:8px}
+  .chain-badge{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+  .chain-badge.crit{background:var(--crit-bg);color:var(--crit);border:1px solid rgba(255,51,102,0.3)}
+  .chain-steps{display:flex;align-items:center;gap:0;flex-wrap:wrap}
+  .chain-step{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:100px;flex:1}
+  .chain-step-box{background:var(--bg4);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center;width:100%;position:relative}
+  .chain-step-icon{font-size:18px;margin-bottom:2px}
+  .chain-step-label{font-size:9px;color:var(--text2);font-family:'JetBrains Mono',monospace;line-height:1.3}
+  .chain-step-tech{font-size:8px;color:var(--accent);font-family:'JetBrains Mono',monospace;margin-top:2px}
+  .chain-arrow{color:var(--crit);font-size:16px;padding:0 4px;flex-shrink:0;align-self:center;margin-top:-12px}
+  .chain-impact{margin-top:1rem;padding:8px 12px;background:rgba(255,51,102,0.06);border:1px solid rgba(255,51,102,0.15);border-radius:6px;font-size:11px;color:var(--text2)}
+  .chain-impact strong{color:var(--crit)}
+
+  /* FINDINGS TABLE */
+  .findings-table{width:100%;border-collapse:collapse}
+  .findings-table th{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg3);font-weight:600}
+  .findings-table td{padding:12px;border-bottom:1px solid var(--border);vertical-align:top;font-size:12px}
+  .findings-table tr:last-child td{border-bottom:none}
+  .findings-table tr:hover td{background:rgba(255,255,255,0.02)}
+  .risk-badge{font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap}
+  .risk-CRITICAL{background:var(--crit-bg);color:var(--crit);border:1px solid rgba(255,51,102,0.3)}
+  .risk-HIGH{background:var(--high-bg);color:var(--high);border:1px solid rgba(255,107,53,0.3)}
+  .risk-MEDIUM{background:var(--med-bg);color:var(--med);border:1px solid rgba(255,165,0,0.3)}
+  .risk-LOW{background:var(--low-bg);color:var(--low);border:1px solid rgba(0,212,255,0.3)}
+  .score-bar-wrap{display:flex;align-items:center;gap:6px}
+  .score-bar{height:4px;border-radius:2px;flex:1;background:var(--bg4)}
+  .score-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--accent3),var(--crit))}
+  .score-num-sm{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;width:28px}
+  .resource-name{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent);font-weight:500}
+  .resource-type{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px}
+  .threat-type{font-size:11px;font-weight:500;color:var(--text)}
+  .threat-mitre{font-size:9px;color:var(--text2);font-family:'JetBrains Mono',monospace;margin-top:2px}
+  .expand-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:10px;font-family:'JetBrains Mono',monospace;padding:2px 0;text-decoration:underline}
+  .detail-row td{background:var(--bg3);padding:12px}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .detail-section h4{font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--text2);margin-bottom:8px;font-weight:600}
+  .remediation-steps{list-style:none;display:flex;flex-direction:column;gap:5px}
+  .remediation-steps li{font-size:11px;color:var(--text2);padding-left:14px;position:relative;line-height:1.5}
+  .remediation-steps li::before{content:"→";position:absolute;left:0;color:var(--accent3);font-size:10px}
+  .score-breakdown{display:flex;gap:12px;flex-wrap:wrap}
+  .breakdown-item{display:flex;flex-direction:column;gap:2px}
+  .breakdown-label{font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2)}
+  .breakdown-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700}
+  .real-world{font-size:11px;color:var(--text2);line-height:1.5;border-left:2px solid var(--accent4);padding-left:8px;font-style:italic}
+
+  /* SCAN INFO BAR */
+  .scan-info{display:flex;align-items:center;gap:16px;padding:8px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;margin-bottom:1.5rem;flex-wrap:wrap}
+  .scan-info-item{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);display:flex;align-items:center;gap:6px}
+  .scan-info-item span{color:var(--text)}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--accent3);flex-shrink:0;box-shadow:0 0 6px var(--accent3)}
+
+  /* TABS */
+  .tabs{display:flex;gap:4px;margin-bottom:1rem}
+  .tab{font-size:11px;font-weight:600;padding:6px 14px;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);letter-spacing:0.3px;transition:all .15s;text-transform:uppercase}
+  .tab.active{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  .tab:hover:not(.active){border-color:var(--border2);color:var(--text)}
+
+  /* EMPTY STATE */
+  .empty-state{text-align:center;padding:3rem;color:var(--text2)}
+  .empty-state p{font-size:13px;margin-top:8px}
+
+  /* WELCOME */
+  .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;gap:1.5rem}
+  .welcome-icon{width:80px;height:80px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .welcome h2{font-size:24px;font-weight:800}
+  .welcome p{font-size:14px;color:var(--text2);max-width:400px;line-height:1.6}
+  .welcome-features{display:flex;gap:2rem;flex-wrap:wrap;justify-content:center}
+  .welcome-feature{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
+  .feature-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);flex-shrink:0}
+  .big-scan-btn{background:var(--accent);color:var(--bg);border:none;padding:14px 40px;border-radius:8px;font-family:'Syne',sans-serif;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:0.3px;transition:all .2s;margin-top:8px}
+  .big-scan-btn:hover{background:#22e0ff;transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,212,255,0.3)}
+
+  @media(max-width:900px){
+    .grid-2{grid-template-columns:1fr}
+    .score-banner{grid-template-columns:auto 1fr;gap:1rem}
+    .stat-card{display:none}
+  }
+</style>
+</head>
+<body>
+
+<div class="scan-overlay hidden" id="scanOverlay">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="logo-icon"><svg viewBox="0 0 20 20"><path d="M10 1L2 5v6c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V5L10 1zm-1 13l-3-3 1.4-1.4L9 11.2l4.6-4.6L15 8l-6 6z"/></svg></div>
+    <span class="scan-title">Scanning AWS Resources</span>
+  </div>
+  <div class="scan-progress"><div class="scan-bar" id="scanBar"></div></div>
+  <div class="scan-steps" id="scanSteps"></div>
+</div>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon"><svg viewBox="0 0 20 20"><path d="M10 1L2 5v6c0 4.4 3.4 8.5 8 9.5 4.6-1 8-5.1 8-9.5V5L10 1zm-1 13l-3-3 1.4-1.4L9 11.2l4.6-4.6L15 8l-6 6z"/></svg></div>
+    <div>
+      <div class="logo-text">CloudGuard</div>
+      <div class="logo-sub">Threat Detection System</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="mode-badge" id="modeBadge">Demo Mode</div>
+    <button class="scan-btn" id="scanBtn" onclick="startScan()">
+      <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5A5.5 5.5 0 1 1 8 2.5a5.5 5.5 0 0 1 0 11zm0-9a.75.75 0 0 1 .75.75v3.5l2.25 1.3a.75.75 0 0 1-.75 1.3L7.25 9.7a.75.75 0 0 1-.5-.7V5.25A.75.75 0 0 1 8 4.5z"/></svg>
+      Scan AWS
+    </button>
+  </div>
+</div>
+
+<div class="main" id="mainContent">
+  <div class="welcome" id="welcomeView">
+    <div class="welcome-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--accent)">
+        <path d="M12 2L3 7v5c0 5.25 4.05 10.15 9 11.25C17.95 22.15 22 17.25 22 12V7L12 2z"/>
+        <polyline points="9,12 11,14 15,10"/>
+      </svg>
+    </div>
+    <h2>Intelligent Cloud Misconfiguration<br/>Detection System</h2>
+    <p>Scan your AWS infrastructure for misconfigurations, calculate dynamic risk scores, map threats to real-world attack scenarios, and visualize complete attack chains.</p>
+    <div class="welcome-features">
+      <div class="welcome-feature"><span class="feature-dot"></span>S3 Public Access & Encryption</div>
+      <div class="welcome-feature"><span class="feature-dot"></span>IAM Wildcard Permissions</div>
+      <div class="welcome-feature"><span class="feature-dot"></span>EC2 Security Group Analysis</div>
+      <div class="welcome-feature"><span class="feature-dot"></span>Dynamic Risk Scoring Engine</div>
+      <div class="welcome-feature"><span class="feature-dot"></span>MITRE ATT&CK Mapping</div>
+      <div class="welcome-feature"><span class="feature-dot"></span>Attack Chain Visualization</div>
+    </div>
+    <button class="big-scan-btn" onclick="startScan()">▶ Run Security Scan</button>
+  </div>
+
+  <div id="resultsView" class="hidden">
+
+    <div class="scan-info" id="scanInfoBar"></div>
+
+    <div class="score-banner" id="scoreBanner"></div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--crit)"><path d="M8 1l7 12H1L8 1zm0 4v4M8 11h.01"/></svg>
+          <span class="panel-title">Severity Distribution</span>
+          <span class="panel-badge" id="sevTotal"></span>
+        </div>
+        <div class="panel-body">
+          <div class="sev-bars" id="sevBars"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent)"><rect x="1" y="4" width="14" height="10" rx="1"/><path d="M5 4V2h6v2"/></svg>
+          <span class="panel-title">Resources Scanned</span>
+          <span class="panel-badge" id="resTotal"></span>
+        </div>
+        <div class="panel-body">
+          <div class="res-bars" id="resBars"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-full panel">
+      <div class="panel-header">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--crit)"><path d="M8 0L0 4v4c0 4.4 3.4 8.5 8 9.5C12.6 16.5 16 12.4 16 8V4L8 0z"/></svg>
+        <span class="panel-title">Active Attack Chains</span>
+        <span class="panel-badge" id="chainCount"></span>
+      </div>
+      <div class="panel-body">
+        <div id="attackChains"></div>
+      </div>
+    </div>
+
+    <div class="grid-full panel">
+      <div class="panel-header">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="var(--accent)"><path d="M2 2h12v12H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 6h6M5 9h4" stroke="currentColor" stroke-width="1.5"/></svg>
+        <span class="panel-title">Findings</span>
+        <div class="tabs" id="findingsTabs" style="margin-bottom:0;margin-left:12px">
+          <div class="tab active" onclick="filterFindings('ALL',this)">All</div>
+          <div class="tab" onclick="filterFindings('CRITICAL',this)">Critical</div>
+          <div class="tab" onclick="filterFindings('HIGH',this)">High</div>
+          <div class="tab" onclick="filterFindings('MEDIUM',this)">Medium</div>
+        </div>
+        <span class="panel-badge" id="findingsCount" style="margin-left:auto"></span>
+      </div>
+      <div class="panel-body" style="padding:0;overflow-x:auto">
+        <table class="findings-table" id="findingsTable">
+          <thead>
+            <tr>
+              <th>Resource</th>
+              <th>Issue</th>
+              <th>Risk Score</th>
+              <th>Severity</th>
+              <th>Threat Type</th>
+              <th>Priority</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="findingsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const MOCK_DATA = {"scan_info":{"account_id":"123456789012","region":"us-east-1","timestamp":"2026-04-19T10:30:00Z","mode":"mock","resources_scanned":{"s3_buckets":4,"iam_policies":4,"security_groups":3}},"overall":{"security_score":15.3,"grade":"F","label":"Critical Risk","total_findings":12,"severity_breakdown":{"CRITICAL":8,"HIGH":1,"MEDIUM":3,"LOW":0},"highest_risk_score":94,"average_risk_score":79.1},"findings":[{"resource_type":"IAM Policy","resource_name":"DevOpsFullAccess","resource_id":"arn:aws:iam::123456789012:policy/DevOpsFullAccess","issue_type":"WILDCARD_PERMISSIONS","issue_title":"IAM Policy with Full Wildcard Permissions (Action:* Resource:*)","description":"Policy 'DevOpsFullAccess' grants unrestricted access to ALL AWS services and resources. Attached to: role/DevOpsRole, group/DevTeam.","risk_score":94,"risk_label":"CRITICAL","score_breakdown":{"exposure":85,"permission":100,"impact":100},"threat":{"attack_type":"Privilege Escalation","mitre_tactic":"TA0004 - Privilege Escalation","mitre_technique":"T1078 - Valid Accounts / T1098 - Account Manipulation","real_world_example":"Tesla cryptojacking incident (2018) - attackers exploited over-permissioned IAM to mine cryptocurrency"},"remediation":{"priority":"IMMEDIATE","steps":["Apply principle of least privilege - grant only required permissions","Replace wildcard with specific service actions (e.g., s3:GetObject, ec2:StartInstances)","Use AWS IAM Access Analyzer to identify unused permissions","Implement permission boundaries to cap maximum permissions","Enable AWS CloudTrail to audit API calls by this policy","Use AWS Organizations SCPs to prevent future wildcard policies"]},"affected_chain_ids":["chain_1"]},{"resource_type":"Security Group","resource_name":"web-server-sg","resource_id":"sg-0a1b2c3d4e5f67890","issue_type":"OPEN_PORT_3389","issue_title":"Port 3389 (RDP) Exposed to Internet (0.0.0.0/0)","description":"Security group 'web-server-sg' allows inbound RDP from any IP address. Affects 2 instance(s).","risk_score":91,"risk_label":"CRITICAL","score_breakdown":{"exposure":99,"permission":80,"impact":96},"threat":{"attack_type":"Remote Desktop Exploitation","mitre_tactic":"TA0001 - Initial Access","mitre_technique":"T1021.001 - Remote Desktop Protocol","real_world_example":"WannaCry and NotPetya spread partly via exposed RDP and SMB"},"remediation":{"priority":"IMMEDIATE","steps":["Restrict inbound RDP access to specific IP ranges or VPN CIDR","Use AWS Systems Manager Session Manager instead of direct SSH access","Place resources in private subnets with NAT gateway","Use AWS WorkSpaces or bastion host for RDP access","Enable NLA (Network Level Authentication) on Windows instances","Apply Windows security patches to prevent BlueKeep/DejaBlue exploitation"]},"affected_chain_ids":[]},{"resource_type":"Security Group","resource_name":"web-server-sg","resource_id":"sg-0a1b2c3d4e5f67890","issue_type":"OPEN_PORT_22","issue_title":"Port 22 (SSH) Exposed to Internet (0.0.0.0/0)","description":"Security group 'web-server-sg' allows inbound SSH from any IP address. Affects 2 instance(s).","risk_score":88,"risk_label":"CRITICAL","score_breakdown":{"exposure":94,"permission":80,"impact":91},"threat":{"attack_type":"Brute Force / Unauthorized Access","mitre_tactic":"TA0001 - Initial Access","mitre_technique":"T1110 - Brute Force / T1021 - Remote Services","real_world_example":"Rocke group (2018) - compromised EC2 instances via exposed SSH for cryptomining"},"remediation":{"priority":"IMMEDIATE","steps":["Restrict inbound SSH access to specific IP ranges or VPN CIDR","Use AWS Systems Manager Session Manager instead of direct SSH access","Place resources in private subnets with NAT gateway for outbound traffic","Enable EC2 Instance Connect for temporary key-based access","Implement fail2ban or equivalent brute force protection","Use AWS VPN or Direct Connect for administrative access"]},"affected_chain_ids":["chain_1"]},{"resource_type":"Security Group","resource_name":"db-server-sg","resource_id":"sg-0b2c3d4e5f678901","issue_type":"OPEN_PORT_27017","issue_title":"Port 27017 (MongoDB) Exposed to Internet (0.0.0.0/0)","description":"Security group 'db-server-sg' allows inbound MongoDB from any IP address. Affects 1 instance(s).","risk_score":87,"risk_label":"CRITICAL","score_breakdown":{"exposure":90,"permission":80,"impact":93},"threat":{"attack_type":"Database Compromise","mitre_tactic":"TA0006 - Credential Access","mitre_technique":"T1190 - Exploit Public-Facing Application","real_world_example":"MongoDB apocalypse (2017) - 27,000+ unprotected databases wiped by attackers"},"remediation":{"priority":"HIGH","steps":["Restrict inbound MongoDB access to specific IP ranges or VPN CIDR","Place resources in private subnets with NAT gateway","Enable MongoDB authentication","Use MongoDB Atlas with built-in network isolation","Enable TLS/SSL for all MongoDB connections"]},"affected_chain_ids":["chain_2"]},{"resource_type":"S3 Bucket","resource_name":"prod-customer-data-backup","resource_id":"arn:aws:s3:::prod-customer-data-backup","issue_type":"PUBLIC_ACCESS","issue_title":"S3 Bucket Publicly Accessible","description":"Bucket 'prod-customer-data-backup' (245GB, 18,420 objects) is publicly accessible via ACL 'public-read'.","risk_score":86,"risk_label":"CRITICAL","score_breakdown":{"exposure":95,"permission":80,"impact":84},"threat":{"attack_type":"Data Exfiltration","mitre_tactic":"TA0010 - Exfiltration","mitre_technique":"T1530 - Data from Cloud Storage","real_world_example":"Capital One breach (2019) - exposed 100M+ customer records from misconfigured S3"},"remediation":{"priority":"IMMEDIATE","steps":["Enable S3 Block Public Access at bucket level","Remove public-read/public-read-write ACL grants","Enable S3 Block Public Access at account level","Use pre-signed URLs for temporary public access instead","Enable S3 access logging to detect unauthorized access"]},"affected_chain_ids":["chain_1"]},{"resource_type":"S3 Bucket","resource_name":"dev-ml-training-datasets","resource_id":"arn:aws:s3:::dev-ml-training-datasets","issue_type":"PUBLIC_ACCESS","issue_title":"S3 Bucket Publicly Accessible","description":"Bucket 'dev-ml-training-datasets' (89GB, 5,230 objects) is publicly accessible via ACL 'public-read-write'.","risk_score":86,"risk_label":"CRITICAL","score_breakdown":{"exposure":95,"permission":95,"impact":68},"threat":{"attack_type":"Data Exfiltration","mitre_tactic":"TA0010 - Exfiltration","mitre_technique":"T1530 - Data from Cloud Storage","real_world_example":"Capital One breach (2019) - exposed 100M+ customer records from misconfigured S3"},"remediation":{"priority":"IMMEDIATE","steps":["Enable S3 Block Public Access at bucket level","Remove public-read/public-read-write ACL grants","Enable S3 Block Public Access at account level","Use pre-signed URLs for temporary public access instead","Enable S3 access logging to detect unauthorized access"]},"affected_chain_ids":["chain_1"]},{"resource_type":"Security Group","resource_name":"db-server-sg","resource_id":"sg-0b2c3d4e5f678901","issue_type":"OPEN_PORT_3306","issue_title":"Port 3306 (MySQL) Exposed to Internet (0.0.0.0/0)","description":"Security group 'db-server-sg' allows inbound MySQL from any IP address. Affects 1 instance(s).","risk_score":85,"risk_label":"CRITICAL","score_breakdown":{"exposure":87,"permission":80,"impact":91},"threat":{"attack_type":"Database Compromise","mitre_tactic":"TA0006 - Credential Access","mitre_technique":"T1190 - Exploit Public-Facing Application","real_world_example":"MongoDB apocalypse (2017) - 27,000+ unprotected databases wiped by attackers"},"remediation":{"priority":"IMMEDIATE","steps":["Restrict inbound MySQL access to specific IP ranges or VPN CIDR","Use AWS Systems Manager Session Manager instead of direct SSH access","Place resources in private subnets","Use RDS with VPC security groups restricted to application tier only","Enable RDS encryption at rest and in transit","Use IAM database authentication instead of static credentials"]},"affected_chain_ids":["chain_2"]},{"resource_type":"Security Group","resource_name":"db-server-sg","resource_id":"sg-0b2c3d4e5f678901","issue_type":"OPEN_PORT_5432","issue_title":"Port 5432 (PostgreSQL) Exposed to Internet (0.0.0.0/0)","description":"Security group 'db-server-sg' allows inbound PostgreSQL from any IP address. Affects 1 instance(s).","risk_score":85,"risk_label":"CRITICAL","score_breakdown":{"exposure":87,"permission":80,"impact":91},"threat":{"attack_type":"Database Compromise","mitre_tactic":"TA0006 - Credential Access","mitre_technique":"T1190 - Exploit Public-Facing Application","real_world_example":"MongoDB apocalypse (2017) - 27,000+ unprotected databases wiped by attackers"},"remediation":{"priority":"HIGH","steps":["Restrict inbound PostgreSQL access to specific IP ranges or VPN CIDR","Place resources in private subnets","Restrict to application server security group ID (not CIDR)","Enable pg_audit for comprehensive query logging","Use SSL certificates for all database connections"]},"affected_chain_ids":["chain_2"]},{"resource_type":"IAM Policy","resource_name":"S3AdminPolicy","resource_id":"arn:aws:iam::123456789012:policy/S3AdminPolicy","issue_type":"S3_WILDCARD","issue_title":"IAM Policy with Unrestricted S3 Access","description":"Policy 'S3AdminPolicy' grants s3:* on all resources (*). Attached to: user/john.doe, role/AppRole.","risk_score":73,"risk_label":"HIGH","score_breakdown":{"exposure":70,"permission":85,"impact":80},"threat":{"attack_type":"Unrestricted Storage Access","mitre_tactic":"TA0004 - Privilege Escalation","mitre_technique":"T1530 - Data from Cloud Storage","real_world_example":"Multiple ransomware attacks targeting S3 with wildcard policies"},"remediation":{"priority":"HIGH","steps":["Restrict to specific S3 buckets (arn:aws:s3:::bucket-name/*)","Separate read (s3:GetObject) from write (s3:PutObject) permissions","Avoid s3:DeleteObject unless explicitly required","Use S3 bucket policies as a secondary access control layer"]},"affected_chain_ids":["chain_1"]},{"resource_type":"S3 Bucket","resource_name":"internal-logs-archive","resource_id":"arn:aws:s3:::internal-logs-archive","issue_type":"NO_ENCRYPTION","issue_title":"S3 Bucket Encryption Disabled","description":"Bucket 'internal-logs-archive' has no server-side encryption. Data stored in plaintext.","risk_score":51,"risk_label":"MEDIUM","score_breakdown":{"exposure":30,"permission":50,"impact":65},"threat":{"attack_type":"Data Exposure at Rest","mitre_tactic":"TA0009 - Collection","mitre_technique":"T1530 - Data from Cloud Storage","real_world_example":"Numerous HIPAA violations traced to unencrypted S3 buckets"},"remediation":{"priority":"HIGH","steps":["Enable S3 default encryption (SSE-S3 or SSE-KMS)","Use SSE-KMS for sensitive data with customer-managed keys","Enable bucket key to reduce KMS API costs","Implement S3 bucket policy to enforce encrypted uploads only"]},"affected_chain_ids":[]},{"resource_type":"S3 Bucket","resource_name":"prod-customer-data-backup","resource_id":"arn:aws:s3:::prod-customer-data-backup","issue_type":"NO_ENCRYPTION","issue_title":"S3 Bucket Encryption Disabled","description":"Bucket 'prod-customer-data-backup' has no server-side encryption. Data stored in plaintext.","risk_score":60,"risk_label":"MEDIUM","score_breakdown":{"exposure":70,"permission":50,"impact":65},"threat":{"attack_type":"Data Exposure at Rest","mitre_tactic":"TA0009 - Collection","mitre_technique":"T1530 - Data from Cloud Storage","real_world_example":"Numerous HIPAA violations traced to unencrypted S3 buckets"},"remediation":{"priority":"HIGH","steps":["Enable S3 default encryption (SSE-S3 or SSE-KMS)","Use SSE-KMS with customer-managed CMK for PII data","Enable bucket key to reduce KMS API costs","Enforce encrypted uploads via bucket policy"]},"affected_chain_ids":[]},{"resource_type":"S3 Bucket","resource_name":"dev-ml-training-datasets","resource_id":"arn:aws:s3:::dev-ml-training-datasets","issue_type":"NO_ENCRYPTION","issue_title":"S3 Bucket Encryption Disabled","description":"Bucket 'dev-ml-training-datasets' has no server-side encryption.","risk_score":60,"risk_label":"MEDIUM","score_breakdown":{"exposure":70,"permission":50,"impact":65},"threat":{"attack_type":"Data Exposure at Rest","mitre_tactic":"TA0009 - Collection","mitre_technique":"T1530 - Data from Cloud Storage","real_world_example":"Numerous HIPAA violations traced to unencrypted S3 buckets"},"remediation":{"priority":"MEDIUM","steps":["Enable S3 default encryption (SSE-S3 minimum)","Consider SSE-KMS for proprietary ML datasets","Implement lifecycle policies to reduce exposure window"]},"affected_chain_ids":[]}],"attack_chains":[{"id":"chain_1","name":"Full Account Compromise Chain","severity":"CRITICAL","steps":[{"step":1,"resource":"EC2 Security Group","action":"Initial Access via exposed SSH (port 22 → 0.0.0.0/0)","technique":"T1110 - Brute Force","icon":"🌐"},{"step":2,"resource":"EC2 Instance","action":"Attacker gains shell access, discovers attached IAM role","technique":"T1078 - Valid Accounts","icon":"💻"},{"step":3,"resource":"IAM Role (DevOpsFullAccess)","action":"Exploits wildcard IAM policy (*:*) for privilege escalation","technique":"T1098 - Account Manipulation","icon":"🔑"},{"step":4,"resource":"S3 Bucket (prod-customer-data-backup)","action":"Exfiltrates 245GB of customer PII data from public bucket","technique":"T1530 - Data from Cloud Storage","icon":"📦"},{"step":5,"resource":"AWS Account","action":"Creates backdoor IAM user, deploys cryptominer, demands ransom","technique":"T1496 - Resource Hijacking","icon":"💀"}],"business_impact":"Full data breach, regulatory fines (GDPR/HIPAA), service disruption, reputational damage","estimated_cost":"$4.2M - $8.5M (avg. breach cost + fines)","triggers":["open_ssh","iam_wildcard","public_s3"],"matched_triggers":["open_ssh","iam_wildcard","public_s3"],"completion_pct":100},{"id":"chain_2","name":"Database Ransomware Chain","severity":"CRITICAL","steps":[{"step":1,"resource":"EC2 Security Group (db-server-sg)","action":"Discovers exposed MySQL/PostgreSQL (3306/5432 → 0.0.0.0/0)","technique":"T1046 - Network Service Scanning","icon":"🔍"},{"step":2,"resource":"Database Server","action":"Brute forces credentials or exploits CVE in database engine","technique":"T1110 - Brute Force","icon":"🗄️"},{"step":3,"resource":"Database","action":"Exfiltrates all tables, drops database, leaves ransom note","technique":"T1485 - Data Destruction","icon":"💀"}],"business_impact":"Data loss, operational downtime, regulatory violations","estimated_cost":"$1.5M - $3M","triggers":["open_database"],"matched_triggers":["open_database"],"completion_pct":100}]};
+
+let currentData = null;
+let currentFilter = 'ALL';
+let expandedRows = new Set();
+
+function startScan() {
+  const overlay = document.getElementById('scanOverlay');
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true;
+  overlay.classList.remove('hidden');
+
+  const steps = [
+    '> Authenticating with AWS STS...',
+    '> Enumerating S3 buckets (4 found)...',
+    '> Checking S3 public access blocks...',
+    '> Auditing S3 encryption policies...',
+    '> Scanning IAM policies (4 policies)...',
+    '> Detecting wildcard permissions...',
+    '> Analyzing EC2 security groups (3 groups)...',
+    '> Checking inbound rules for 0.0.0.0/0...',
+    '> Running risk scoring engine...',
+    '> Mapping MITRE ATT&CK techniques...',
+    '> Building attack chain correlations...',
+    '> Generating remediation playbooks...',
+  ];
+
+  const stepsEl = document.getElementById('scanSteps');
+  stepsEl.innerHTML = steps.map((s,i) => `
+    <div class="scan-step" id="step${i}">
+      <div class="scan-step-dot"></div>
+      <span>${s}</span>
+    </div>`).join('');
+
+  const bar = document.getElementById('scanBar');
+  let idx = 0;
+
+  const tick = () => {
+    if(idx > 0) {
+      document.getElementById(`step${idx-1}`).className = 'scan-step done';
+    }
+    if(idx < steps.length) {
+      document.getElementById(`step${idx}`).className = 'scan-step active';
+      bar.style.width = `${Math.round((idx+1)/steps.length*100)}%`;
+      idx++;
+      setTimeout(tick, 200 + Math.random()*180);
+    } else {
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+        btn.disabled = false;
+        renderResults(MOCK_DATA);
+      }, 400);
+    }
+  };
+  tick();
+}
+
+function renderResults(data) {
+  currentData = data;
+  document.getElementById('welcomeView').classList.add('hidden');
+  document.getElementById('resultsView').classList.remove('hidden');
+  document.getElementById('modeBadge').textContent = data.scan_info.mode === 'mock' ? 'Demo Mode' : 'Live AWS';
+
+  renderScanInfo(data);
+  renderScoreBanner(data);
+  renderSeverityBars(data);
+  renderResourceBars(data);
+  renderAttackChains(data);
+  renderFindings(data.findings);
+}
+
+function renderScanInfo(data) {
+  const si = data.scan_info;
+  const ts = new Date(si.timestamp).toLocaleString();
+  document.getElementById('scanInfoBar').innerHTML = `
+    <div class="scan-info-item"><div class="dot"></div> Scan Complete</div>
+    <div class="scan-info-item">Account: <span>${si.account_id}</span></div>
+    <div class="scan-info-item">Region: <span>${si.region}</span></div>
+    <div class="scan-info-item">Time: <span>${ts}</span></div>
+    <div class="scan-info-item">Mode: <span>${si.mode}</span></div>
+    <div class="scan-info-item">Resources: <span>${Object.values(si.resources_scanned).reduce((a,b)=>a+b,0)} total</span></div>
+  `;
+}
+
+function renderScoreBanner(data) {
+  const o = data.overall;
+  const score = o.security_score;
+  const color = score < 40 ? '#ff3366' : score < 60 ? '#ff6b35' : score < 75 ? '#ffa500' : '#00ff88';
+  const r = 36, cx = 45, cy = 45;
+  const circumference = 2 * Math.PI * r;
+  const dash = (score / 100) * circumference;
+
+  document.getElementById('scoreBanner').innerHTML = `
+    <div class="score-ring">
+      <svg width="90" height="90" viewBox="0 0 90 90">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--bg4)" stroke-width="6"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="6"
+          stroke-dasharray="${dash.toFixed(1)} ${circumference.toFixed(1)}" stroke-linecap="round" style="transition:stroke-dasharray 1.2s ease"/>
+      </svg>
+      <div class="score-ring-text">
+        <div class="score-num" style="color:${color}">${Math.round(score)}</div>
+        <div class="score-grade" style="color:${color}">${o.grade}</div>
+      </div>
+    </div>
+    <div class="score-info">
+      <h1>Security Score: ${o.label}</h1>
+      <p>Avg risk: ${o.average_risk_score} · Peak risk: ${o.highest_risk_score} · ${o.total_findings} findings</p>
+    </div>
+    <div class="stat-card"><div class="stat-card-num crit-col">${o.severity_breakdown.CRITICAL}</div><div class="stat-card-label">Critical</div></div>
+    <div class="stat-card"><div class="stat-card-num high-col">${o.severity_breakdown.HIGH}</div><div class="stat-card-label">High</div></div>
+    <div class="stat-card"><div class="stat-card-num med-col">${o.severity_breakdown.MEDIUM}</div><div class="stat-card-label">Medium</div></div>
+    <div class="stat-card"><div class="stat-card-num low-col">${o.severity_breakdown.LOW}</div><div class="stat-card-label">Low</div></div>
+  `;
+  document.getElementById('sevTotal').textContent = `${o.total_findings} total`;
+}
+
+function renderSeverityBars(data) {
+  const bd = data.overall.severity_breakdown;
+  const total = data.overall.total_findings;
+  const items = [
+    {key:'CRITICAL', label:'Critical', color:'var(--crit)', count:bd.CRITICAL},
+    {key:'HIGH', label:'High', color:'var(--high)', count:bd.HIGH},
+    {key:'MEDIUM', label:'Medium', color:'var(--med)', count:bd.MEDIUM},
+    {key:'LOW', label:'Low', color:'var(--low)', count:bd.LOW},
+  ];
+  document.getElementById('sevBars').innerHTML = items.map(i => `
+    <div class="sev-row">
+      <span class="sev-label" style="color:${i.color}">${i.label}</span>
+      <div class="sev-track"><div class="sev-fill" style="width:${Math.round(total>0?i.count/total*100:0)}%;background:${i.color}"></div></div>
+      <span class="sev-count" style="color:${i.color}">${i.count}</span>
+    </div>
+  `).join('');
+}
+
+function renderResourceBars(data) {
+  const si = data.scan_info.resources_scanned;
+  const resources = [
+    {label:'S3 Buckets', count:si.s3_buckets, color:'#00d4ff', max:10},
+    {label:'IAM Policies', count:si.iam_policies, color:'#ffa500', max:10},
+    {label:'Security Groups', count:si.security_groups, color:'#00ff88', max:10},
+  ];
+  document.getElementById('resBars').innerHTML = resources.map(r => `
+    <div class="res-row">
+      <span class="res-label">${r.label}</span>
+      <div class="res-track">
+        <div class="res-fill" style="width:${Math.round(r.count/r.max*100)}%;background:${r.color}">${r.count}</div>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('resTotal').textContent = `${Object.values(si).reduce((a,b)=>a+b,0)} scanned`;
+}
+
+function renderAttackChains(data) {
+  const chains = data.attack_chains;
+  document.getElementById('chainCount').textContent = `${chains.length} active`;
+
+  if(!chains.length) {
+    document.getElementById('attackChains').innerHTML = '<div class="empty-state"><p>No active attack chains detected.</p></div>';
+    return;
+  }
+
+  document.getElementById('attackChains').innerHTML = chains.map(chain => {
+    const stepsHtml = chain.steps.map((step, i) => `
+      ${i > 0 ? '<div class="chain-arrow">→</div>' : ''}
+      <div class="chain-step">
+        <div class="chain-step-box">
+          <div class="chain-step-icon">${step.icon}</div>
+          <div class="chain-step-label">${step.resource}</div>
+          <div class="chain-step-tech">${step.technique.split(' - ')[0]}</div>
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="chain-card">
+        <div class="chain-header">
+          <span class="chain-name">${chain.name}</span>
+          <div class="chain-meta">
+            <span class="chain-badge crit">${chain.severity}</span>
+            <span class="chain-badge crit">${chain.completion_pct}% Match</span>
+          </div>
+        </div>
+        <div class="chain-steps">${stepsHtml}</div>
+        <div class="chain-impact">
+          <strong>Business Impact:</strong> ${chain.business_impact}<br/>
+          <strong>Estimated Cost:</strong> ${chain.estimated_cost}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function filterFindings(label, el) {
+  currentFilter = label;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderFindings(currentData.findings);
+}
+
+function renderFindings(findings) {
+  const filtered = currentFilter === 'ALL' ? findings : findings.filter(f => f.risk_label === currentFilter);
+  document.getElementById('findingsCount').textContent = `${filtered.length} findings`;
+  const tbody = document.getElementById('findingsTbody');
+
+  tbody.innerHTML = filtered.map((f, idx) => {
+    const pColor = f.remediation.priority === 'IMMEDIATE' ? 'var(--crit)' : f.remediation.priority === 'HIGH' ? 'var(--high)' : 'var(--med)';
+    return `
+      <tr>
+        <td>
+          <div class="resource-name">${f.resource_name}</div>
+          <div class="resource-type">${f.resource_type}</div>
+        </td>
+        <td style="max-width:220px">
+          <div style="font-size:12px;font-weight:500;line-height:1.4">${f.issue_title}</div>
+        </td>
+        <td>
+          <div class="score-bar-wrap">
+            <span class="score-num-sm" style="color:${getRiskColor(f.risk_label)}">${f.risk_score}</span>
+            <div class="score-bar" style="width:80px"><div class="score-bar-fill" style="width:${f.risk_score}%"></div></div>
+          </div>
+        </td>
+        <td><span class="risk-badge risk-${f.risk_label}">${f.risk_label}</span></td>
+        <td>
+          <div class="threat-type">${f.threat.attack_type}</div>
+          <div class="threat-mitre">${f.threat.mitre_technique.split('/')[0].trim()}</div>
+        </td>
+        <td><span style="font-size:11px;font-weight:600;color:${pColor};font-family:'JetBrains Mono',monospace">${f.remediation.priority}</span></td>
+        <td><button class="expand-btn" onclick="toggleDetail(${idx},'${f.issue_type}')">details ▾</button></td>
+      </tr>
+      <tr class="detail-row hidden" id="detail-${idx}-${f.issue_type}">
+        <td colspan="7">
+          <div class="detail-grid">
+            <div class="detail-section">
+              <h4>Remediation Steps</h4>
+              <ul class="remediation-steps">
+                ${f.remediation.steps.map(s => `<li>${s}</li>`).join('')}
+              </ul>
+            </div>
+            <div class="detail-section">
+              <h4>Risk Score Breakdown</h4>
+              <div class="score-breakdown" style="margin-bottom:12px">
+                <div class="breakdown-item">
+                  <span class="breakdown-label">Exposure</span>
+                  <span class="breakdown-val" style="color:var(--crit)">${f.score_breakdown.exposure}</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-label">Permission</span>
+                  <span class="breakdown-val" style="color:var(--high)">${f.score_breakdown.permission}</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-label">Impact</span>
+                  <span class="breakdown-val" style="color:var(--med)">${f.score_breakdown.impact}</span>
+                </div>
+                <div class="breakdown-item">
+                  <span class="breakdown-label">Final Score</span>
+                  <span class="breakdown-val" style="color:${getRiskColor(f.risk_label)}">${f.risk_score}</span>
+                </div>
+              </div>
+              <h4 style="margin-bottom:8px">Real-world Reference</h4>
+              <div class="real-world">${f.threat.real_world_example}</div>
+              <div style="margin-top:10px">
+                <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2)">MITRE Tactic: </span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent)">${f.threat.mitre_tactic}</span>
+              </div>
+              <div style="margin-top:4px">
+                <span style="font-size:9px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2)">Technique: </span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--accent)">${f.threat.mitre_technique}</span>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function toggleDetail(idx, type) {
+  const row = document.getElementById(`detail-${idx}-${type}`);
+  const key = `${idx}-${type}`;
+  if(expandedRows.has(key)) {
+    expandedRows.delete(key);
+    row.classList.add('hidden');
+  } else {
+    expandedRows.add(key);
+    row.classList.remove('hidden');
+  }
+}
+
+function getRiskColor(label) {
+  return {CRITICAL:'var(--crit)',HIGH:'var(--high)',MEDIUM:'var(--med)',LOW:'var(--low)'}[label] || 'var(--text)';
+}
+</script>
+</body>
+</html>

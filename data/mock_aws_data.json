@@ -1,0 +1,143 @@
+{
+  "account_id": "123456789012",
+  "region": "us-east-1",
+  "scan_timestamp": "2024-01-15T10:30:00Z",
+  "s3_buckets": [
+    {
+      "name": "prod-customer-data-backup",
+      "region": "us-east-1",
+      "public_access": true,
+      "encryption": false,
+      "versioning": false,
+      "logging": false,
+      "acl": "public-read",
+      "size_gb": 245,
+      "object_count": 18420
+    },
+    {
+      "name": "dev-ml-training-datasets",
+      "region": "us-west-2",
+      "public_access": true,
+      "encryption": false,
+      "versioning": true,
+      "logging": false,
+      "acl": "public-read-write",
+      "size_gb": 89,
+      "object_count": 5230
+    },
+    {
+      "name": "internal-logs-archive",
+      "region": "us-east-1",
+      "public_access": false,
+      "encryption": false,
+      "versioning": false,
+      "logging": false,
+      "acl": "private",
+      "size_gb": 12,
+      "object_count": 890
+    },
+    {
+      "name": "secure-compliance-docs",
+      "region": "eu-west-1",
+      "public_access": false,
+      "encryption": true,
+      "versioning": true,
+      "logging": true,
+      "acl": "private",
+      "size_gb": 5,
+      "object_count": 120
+    }
+  ],
+  "iam_policies": [
+    {
+      "policy_name": "DevOpsFullAccess",
+      "policy_arn": "arn:aws:iam::123456789012:policy/DevOpsFullAccess",
+      "attached_to": ["role/DevOpsRole", "group/DevTeam"],
+      "statements": [
+        {
+          "effect": "Allow",
+          "action": ["*"],
+          "resource": ["*"]
+        }
+      ],
+      "version": "2012-10-17"
+    },
+    {
+      "policy_name": "S3AdminPolicy",
+      "policy_arn": "arn:aws:iam::123456789012:policy/S3AdminPolicy",
+      "attached_to": ["user/john.doe", "role/AppRole"],
+      "statements": [
+        {
+          "effect": "Allow",
+          "action": ["s3:*"],
+          "resource": ["*"]
+        }
+      ],
+      "version": "2012-10-17"
+    },
+    {
+      "policy_name": "EC2ReadOnly",
+      "policy_arn": "arn:aws:iam::123456789012:policy/EC2ReadOnly",
+      "attached_to": ["role/MonitorRole"],
+      "statements": [
+        {
+          "effect": "Allow",
+          "action": ["ec2:Describe*", "ec2:Get*"],
+          "resource": ["*"]
+        }
+      ],
+      "version": "2012-10-17"
+    },
+    {
+      "policy_name": "LambdaExecutionRole",
+      "policy_arn": "arn:aws:iam::123456789012:policy/LambdaExecution",
+      "attached_to": ["role/LambdaRole"],
+      "statements": [
+        {
+          "effect": "Allow",
+          "action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+          "resource": ["arn:aws:logs:*:*:*"]
+        }
+      ],
+      "version": "2012-10-17"
+    }
+  ],
+  "security_groups": [
+    {
+      "group_id": "sg-0a1b2c3d4e5f67890",
+      "group_name": "web-server-sg",
+      "vpc_id": "vpc-12345678",
+      "description": "Web server security group",
+      "inbound_rules": [
+        {"port": 22, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "SSH"},
+        {"port": 80, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "HTTP"},
+        {"port": 443, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "HTTPS"},
+        {"port": 3389, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "RDP"}
+      ],
+      "attached_instances": ["i-0a1b2c3d4", "i-0e5f6a7b8"]
+    },
+    {
+      "group_id": "sg-0b2c3d4e5f678901",
+      "group_name": "db-server-sg",
+      "vpc_id": "vpc-12345678",
+      "description": "Database security group",
+      "inbound_rules": [
+        {"port": 3306, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "MySQL"},
+        {"port": 5432, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "PostgreSQL"},
+        {"port": 27017, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "MongoDB"}
+      ],
+      "attached_instances": ["i-0c3d4e5f6"]
+    },
+    {
+      "group_id": "sg-0c3d4e5f67890123",
+      "group_name": "internal-app-sg",
+      "vpc_id": "vpc-12345678",
+      "description": "Internal application server",
+      "inbound_rules": [
+        {"port": 8080, "protocol": "tcp", "cidr": "10.0.0.0/8", "description": "App port"},
+        {"port": 443, "protocol": "tcp", "cidr": "0.0.0.0/0", "description": "HTTPS"}
+      ],
+      "attached_instances": ["i-0d4e5f6a7"]
+    }
+  ]
+}
